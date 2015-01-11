@@ -11,7 +11,7 @@
 *
 ******************************************************************************/
 
-#include "yb_controls/YoubotArmController.hpp"
+#include "youbotb_controllers/YoubotArmController.hpp"
 
 
 YoubotArmController::YoubotArmController( ros::NodeHandle* _n )
@@ -43,6 +43,8 @@ YoubotArmController::YoubotArmController( ros::NodeHandle* _n )
   currentStepSize_ = 0.1; //rad
   
   joint5Even_ = 2.9;
+  
+  newDataReceived_ = false;
   return;
 }
 
@@ -54,6 +56,7 @@ YoubotArmController::~YoubotArmController()
 void YoubotArmController::stateUpdate( const sensor_msgs::JointStateConstPtr& _newState )
 {
   armState_ = *_newState;
+  newDataReceived_ = true;
   return;
 }
 
@@ -63,9 +66,8 @@ void YoubotArmController::run()
   while( armState_.name.empty() )
   {
     //wait until youbot arm state data arrived
-    ros::spinOnce();
-    ros::Rate rate(10); //Hz
-    rate.sleep();
+    retrieveNewData();
+    
     if( !parentNode_->ok() ) return;
     if( armState_.name.empty() ) cout<<endl<<"Waiting for youbot arm to publish data...";
   }
@@ -182,6 +184,19 @@ void YoubotArmController::run()
 }
 
 
+void YoubotArmController::retrieveNewData()
+{
+  newDataReceived_ = false;
+  ros::Rate rate(10); //Hz
+  while(!newDataReceived_ && parentNode_->ok() )
+  {
+    ros::spinOnce();
+    rate.sleep();
+  }
+  return;
+}
+
+
 void YoubotArmController::publishCommand()
 {
   brics_actuator::JointPositions command;
@@ -217,7 +232,7 @@ void YoubotArmController::publishCommand()
 
 void YoubotArmController::stopArm()
 {
-  ros::spinOnce(); // retrieve newest data...
+  retrieveNewData(); // retrieve newest data...
   for( int i=0; i<jointNames_.size(); i++ )
   {
     commandedPositions_[i] = armState_.position[joint_[i]];

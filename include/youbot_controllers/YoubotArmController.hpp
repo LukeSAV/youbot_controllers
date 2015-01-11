@@ -37,6 +37,8 @@ class YoubotArmController
     ros::Publisher armStatePublisher_;
     ros::Subscriber armStateListener_;
     
+    void retrieveNewData();
+    
     /** publishes the current command set */
     void publishCommand();
     /** stops the robot's arm movement by setting the commanded positions to the current values*/
@@ -67,6 +69,7 @@ class YoubotArmController
     double& commandedPositions( int _pos ); //access interface to commandedPositions_ vector where _pos=1 is 0, _pos=2 is 1, etc (internally)
     int currentJoint_; //currently controlled joint
     double currentStepSize_; //currently used step size
+    bool newDataReceived_;
     
     static double pi;
 };
