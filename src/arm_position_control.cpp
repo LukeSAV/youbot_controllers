@@ -11,7 +11,7 @@
 *
 ******************************************************************************/
 
-#include "yb_controls/YoubotArmController.hpp"
+#include "youbot_controllers/YoubotArmController.hpp"
 
 
 int main(int argc, char **argv) {
