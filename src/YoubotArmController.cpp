@@ -7,7 +7,7 @@
 * Stefan Isler
 *
 *
-* Class provides an interface for controlling the youbot arm.
+* Class provides an interface for forward controlling of the youbot arm.
 *
 ******************************************************************************/
 
@@ -101,6 +101,7 @@ void YoubotArmController::run()
       cout<<"Controlling joint "<<currentJoint_<<"."<<endl<<"Enter command."<<endl;
       
       cin >> userInput;
+      ros::spinOnce(); // needs to happen here since the input operation blocks the program for a while, which means that many state changes might have occured
       switch(userInput)
       {
 	case '?':
@@ -177,7 +178,6 @@ void YoubotArmController::run()
 	  break;
       }
       cin.ignore(cin.gcount());
-      ros::spinOnce(); // not really necessary: don't need to retrieve any data for the current functionality...
     
   }
   return;
