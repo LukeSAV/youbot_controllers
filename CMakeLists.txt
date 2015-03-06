@@ -8,6 +8,8 @@ find_package(catkin REQUIRED COMPONENTS
   brics_actuator
   roscpp
   sensor_msgs
+  geometry_msgs
+  tf
 )
 
 catkin_package(
