@@ -20,7 +20,10 @@ include_directories(include
   ${Boost_INCLUDE_DIRS}
 )
 
-add_executable(arm_position_control src/YoubotArmController.cpp src/arm_position_control.cpp)
+add_executable(arm_position_control
+src/youbot_arm_controller.cpp
+src/arm_position_control.cpp
+)
 
 target_link_libraries(arm_position_control
   ${catkin_LIBRARIES}

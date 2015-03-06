@@ -11,7 +11,7 @@
 *
 ******************************************************************************/
 
-#include "youbot_controllers/YoubotArmController.hpp"
+#include "youbot_controllers/youbot_arm_controller.h"
 
 
 YoubotArmController::YoubotArmController( ros::NodeHandle* _n )
