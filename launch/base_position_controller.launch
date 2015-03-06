@@ -1,1 +1,10 @@
- 
+<?xml version="1.0"?>
+<!-- launches the base joint link interface with the needed parameters -->
+<launch>
+
+  <!-- upload camera and checkerboard parameters -->
+  <rosparam file="$(find youbot_controllers)/config/base_joint_link_config.yaml" command="load" ns=""/>
+    
+  <node name="simple_base_controller" pkg="youbot_controllers" type="simple_base_controller" respawn="false" output="screen"/>
+  
+</launch>

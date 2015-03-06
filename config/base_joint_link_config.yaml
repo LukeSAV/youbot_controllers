@@ -1,0 +1,13 @@
+# configuration for youbot base joint interface
+youbot_base:
+  position_frame: odom
+  base_frame: base_footprint
+  velocity_topic:cmd_vel
+  
+  publish_base_state:true #whether the state of the base is to be published on /joint_states as if it was a joint
+  base_name:youbot_base #name of the base, joint values are published as three joint values base_name/x base_name/y base_name/theta, following moveit conventions
+  
+  pid:
+    p:10
+    i:0
+    d:0

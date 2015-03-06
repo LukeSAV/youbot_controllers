@@ -20,8 +20,55 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 SimpleBasePositionController::SimpleBasePositionController(ros::NodeHandle &nh)
 {
   nh_ = nh;
-  //set up the publisher for the cmd_vel topic
-  velocity_commander_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+  
+  if( !nh_.getParam("/youbot_base/velocity_topic"), velocity_topic_ )
+  {
+    ROS_FATAL("SimpleBasePositionController couldn't be initialized because no youbot_base/velocity_topic parameters was found on parameter server.");
+    ros::shutdown();
+    return;
+  }
+  if( !nh_.getParam("/youbot_base/position_frame"), position_frame_ )
+  {
+    ROS_FATAL("SimpleBasePositionController couldn't be initialized because no youbot_base/position_frame parameters was found on parameter server.");
+    ros::shutdown();
+    return;
+  }
+  if( !nh_.getParam("/youbot_base/base_frame"), base_frame_ )
+  {
+    ROS_FATAL("SimpleBasePositionController couldn't be initialized because no youbot_base/base_frame parameters was found on parameter server.");
+    ros::shutdown();
+    return;
+  }
+  if( !nh_.getParam("/youbot_base/base_name"), base_name_ )
+  {
+    ROS_FATAL("SimpleBasePositionController couldn't be initialized because no youbot_base/base_name parameters was found on parameter server.");
+    ros::shutdown();
+    return;
+  }
+  if( !nh_.getParam("/youbot_base/publish_base_state"), publish_state_ )
+  {
+    ROS_FATAL("SimpleBasePositionController couldn't be initialized because no youbot_base/publish_base_state parameters was found on parameter server.");
+    ros::shutdown();
+    return;
+  }
+  if( !pid_controller_.init( ros::NodeHandle(nh_, "/youbot_base/pid") ) )
+  {
+    ROS_FATAL("SimpleBasePositionController couldn't be initialized because no youbot_base/pid parameters were found on parameter server.");
+    ros::shutdown();
+    return;
+  }
+  
+  //set up the publisher for the velocity command topic
+  velocity_commander_ = nh_.advertise<geometry_msgs::Twist>(velocity_topic_, 1000);
+  
+  // set up publisher for /joint_states topic
+  if( publish_state_ )
+    state_publisher_ = nh_.advertise<sensor_msgs::JointState>("/joint_states", 1);
+}
+
+void SimpleBasePositionController::setCommand(double x, double y, double theta)
+{
+  
 }
 
 //! Drive forward a specified distance based on odometry information

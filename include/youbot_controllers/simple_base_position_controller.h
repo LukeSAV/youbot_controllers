@@ -33,18 +33,22 @@ public:
   /// to store position and velocity commands
    struct Commands
   {
-  double position_; // Last commanded position
-  double velocity_; // Last commanded velocity
-  bool has_velocity_; // false if no velocity command has been specified
+    double x_; // Last commanded position
+    double y_;
+    double theta_;
+    double x_vel_;
+    double y_vel_;
+    double theta_vel_;
+    bool has_velocity_; // false if no velocity command has been specified
   };
   
-  /** initializes the class
+  /** class constructor, also initializes the class, loads parameters from parameter server
    */
   SimpleBasePositionController(ros::NodeHandle &nh);
   
   /** Give set position of the joint for next update
    */
-  void setCommand(double pos_target);
+  void setCommand(double x, double y, double theta);
   
   /** Issues commands to the joint. Should be called at regular intervals
   */
@@ -60,6 +64,13 @@ private:
   ros::Publisher velocity_commander_; /// velocity command publisher
   ros::Publisher state_publisher_; /// publishes the "state" of the base relative to the odometry frame
   tf::TransformListener listener_; /// TF transform listener
+  
+  std::string velocity_topic_; /// where the velocity commands are published to
+  std::string base_frame_; /// tf frame that represents the youbot position
+  std::string position_frame; /// tf frame that represents the world (e.g. the odometry frame)
+  
+  bool publish_state_; /// whether the position state of the controller is published on /joint_states or not
+  std::string base_name_; /// name of the "virtual base link"
   
   control_toolbox::Pid pid_controller_; /// internal PID controller
   
