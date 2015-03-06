@@ -1,6 +1,6 @@
 /* Copyright (c) 2014,2015 , Stefan Isler, islerstefan@bluewin.ch
 *
-This file is part of youbot_controllers, a ROS package providing some additonal controllers for the KUKA youbot,
+This file is part of youbot_controllers, a ROS package providing some additional controllers for the KUKA youbot,
 
 youbot_controllers is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by

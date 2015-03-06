@@ -23,10 +23,19 @@ include_directories(include
 )
 
 add_executable(arm_position_control
-src/youbot_arm_controller.cpp
-src/arm_position_control.cpp
+src/code_base/youbot_arm_controller.cpp
+src/ros_nodes/arm_position_control.cpp
 )
 
 target_link_libraries(arm_position_control
+  ${catkin_LIBRARIES}
+)
+
+add_executable(simple_base_controller
+src/ros_nodes/base_position_control_node.cpp
+src/code_base/simple_base_position_controller.cpp
+)
+
+target_link_libraries(simple_base_controller
   ${catkin_LIBRARIES}
 )

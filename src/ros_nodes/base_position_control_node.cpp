@@ -1,6 +1,6 @@
 /* Copyright (c) 2014,2015 , Stefan Isler, islerstefan@bluewin.ch
 *
-This file is part of youbot_controllers, a ROS package providing some additonal controllers for the KUKA youbot,
+This file is part of youbot_controllers, a ROS package providing some additional controllers for the KUKA youbot,
 
 youbot_controllers is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -14,4 +14,14 @@ You should have received a copy of the GNU Lesser General Public License
 along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <tf/transform_listener.h>
+#include "youbot_controllers/simple_base_position_controller.h"
+
+int main(int argc, char** argv)
+{
+  //init the ROS node
+  ros::init(argc, argv, "robot_driver");
+  ros::NodeHandle nh;
+
+  SimpleBasePositionController driver(nh);
+  driver.driveForwardOdom(0.5);
+}
