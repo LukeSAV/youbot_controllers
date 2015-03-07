@@ -10,8 +10,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   geometry_msgs
+  control_msgs
   tf
   control_toolbox
+  actionlib
 )
 
 ## System dependencies are found with CMake's conventions
@@ -19,7 +21,7 @@ find_package(Boost REQUIRED COMPONENTS system )
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp sensor_msgs brics_actuator angles control_toolbox
+  CATKIN_DEPENDS roscpp sensor_msgs brics_actuator angles control_toolbox actionlib control_msgs
 )
 
 include_directories(include
@@ -50,6 +52,16 @@ src/code_base/simple_base_position_controller.cpp
 )
 
 target_link_libraries(base_position_controller
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
+add_executable(base_trajectory_action_server
+src/ros_nodes/base_trajectory_action_server.cpp
+src/code_base/base_trajectory_action.cpp
+)
+
+target_link_libraries(base_trajectory_action_server
   ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
 )

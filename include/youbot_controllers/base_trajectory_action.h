@@ -15,7 +15,7 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
- * based on the pr2::BaseTrajectoryAction by 
+ * partly based on the pr2/youbot::BaseTrajectoryAction by 
  * Copyright (c) 2011
  * GPS GmbH
  *
@@ -26,41 +26,38 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 /** loads base_controller namespace and node name from parameter server, just as the simple base position controller
  */
 
-#ifndef JOINTTRAJECTORYACTION_H
-#define	JOINTTRAJECTORYACTION_H
+#pragma once
 
 #include <ros/ros.h>
-#include <control_msgs/FollowBaseTrajectoryAction.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 
 #include <sensor_msgs/JointState.h>
-#include <actionlib/server/simple_action_server.h>
+#include <actionlib/server/action_server.h>
 #include <brics_actuator/JointPositions.h>
 #include <brics_actuator/JointVelocities.h>
 
 // still quite a mess, this is just a fast fix to get the job done
 
-namespace KDL
+/*namespace KDL
 {
 class Trajectory_Composite;
-}
-
-typedef actionlib::SimpleActionServer<control_msgs::FollowBaseTrajectoryAction> Server;
+}*/
 
 
 class BaseTrajectoryAction
 {
+typedef actionlib::ActionServer<control_msgs::FollowJointTrajectoryAction> Server;
+typedef Server::GoalHandle GoalHandle;
+
 public:
     BaseTrajectoryAction( ros::NodeHandle& _nh );
     virtual ~BaseTrajectoryAction();
 
-    void executeActionServer(const control_msgs::FollowJointTrajectoryGoalConstPtr& _goal, Server* _as);
-
-    void execute(const control_msgs::FollowJointTrajectoryGoalConstPtr& goal, Server* as);
+    void goalCallback(GoalHandle _goal);
     
-    void jointStateCallback(const sensor_msgs::JointState& joint_state);
-    void jointStateCallback(const brics_actuator::JointPositions& position,
-                            const brics_actuator::JointVelocities& velocity);
+    void cancelCallback(GoalHandle _goal);
+
+    void execute( const control_msgs::FollowJointTrajectoryGoalConstPtr& goal );
 
 
     void setFrequency(double frequency);
@@ -79,6 +76,8 @@ public:
 private:
     ros::NodeHandle nh_;
     
+    bool has_active_goal_;
+    GoalHandle active_goal_;
     boost::shared_ptr<Server> trajectory_server_;
     std::string base_link_name_; /// name of the base link
     std::string base_control_ns_; /// name of the ns in which the position_command topic exists
@@ -93,43 +92,41 @@ private:
     
     /** returns the velocity given in the trajectory trajectoryComposite at time elapsedTimeInSec. If the elapsed time exceeds the time inside the trajectory, velocity zero is returned - unused, comes from model
      */
-    double getVelocityAtTime( const KDL::Trajectory_Composite& trajectoryComposite,
-                             double elapsedTimeInSec);
+    /*double getVelocityAtTime( const KDL::Trajectory_Composite& trajectoryComposite,
+                             double elapsedTimeInSec);*/
     
     /** returns the position given in the trajectory trajectoryComposite at time elapsedTimeInSec - unused, comes from model
      * @throws std::runtime_error If the elapsed time exceeds the time available in the trajectory
      */
-    double getPositionAtTime( const KDL::Trajectory_Composite& trajectoryComposite,
-                             double elapsedTimeInSec);
+    /*double getPositionAtTime( const KDL::Trajectory_Composite& trajectoryComposite,
+                             double elapsedTimeInSec);*/
     
     /** gets all velocities for the current time (using ros::Time::now() ) as given in the trajectory - unused, comes from model
      * @param startTime the time at which trajectory execution started (only used if ignore_time_ is false)
      * @param currentTime the time for which the velocites are wanted (only used if ignore_time_ is true)
      * @return writes into the vector velocities
      */
-    void getAllCurrentVelocities( const KDL::Trajectory_Composite* trajectory,
+    /*void getAllCurrentVelocities( const KDL::Trajectory_Composite* trajectory,
                      int numberOfJoints,
                      ros::Time startTime,
 		     double currentTime,
-                     std::vector<double>& velocities);
+                     std::vector<double>& velocities);*/
     
     /** gets all positions for the current time (using ros::Time::now() ) as given in the trajectory - unused, comes from model
      * @param startTime the time at which trajectory execution started (only used if ignore_time_ is false)
      * @param currentTime the time for which the velocites are wanted (only used if ignore_time_ is true)
      * @return writes into the vector positions
      */
-    void getAllCurrentPositions( const KDL::Trajectory_Composite* trajectory,
+    /*void getAllCurrentPositions( const KDL::Trajectory_Composite* trajectory,
                      int numberOfJoints,
                      ros::Time startTime,
 		     double currentTime,
-                     std::vector<double>& positions);
+                     std::vector<double>& positions);*/
 
-    void setTargetTrajectory(double angle1,
+    /*void setTargetTrajectory(double angle1,
                              double angle2,
                              double duration,
-                             KDL::Trajectory_Composite& trajectoryComposite);
+                             KDL::Trajectory_Composite& trajectoryComposite);*/
 
 };
-
-#endif	/* JOINTTRAJECTORYACTION_H */
 

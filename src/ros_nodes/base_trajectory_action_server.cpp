@@ -17,7 +17,7 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 #include <ros/ros.h>
 #include <youbot_controllers/base_trajectory_action.h>
 
-/** node that expects 2d pose input on the command line from the user and sends it to a base_position_controller */
+/** sets up a trajectory action server that can interface with the base_position_controller - the server features no cancellation means!*/
 
 int main(int argc, char** argv)
 {
@@ -26,25 +26,12 @@ int main(int argc, char** argv)
   //init the ROS node
   ros::init(argc, argv, "robot_driver");
   ros::NodeHandle nh;
-  
-  ros::Publisher commander = nh.advertise<geometry_msgs::Pose2D>("/base_controller/position_command",1);
-  
-  double x,y,theta;
-  
-  while( nh.ok() )
-  {
-    cout<<endl<<endl<<"Please type in the target position (in m and rad) in the following format: x y theta"<<endl;
     
-    cin>>x;
-    cin>>y;
-    cin>>theta;
-    
-    geometry_msgs::Pose2D command;
-    command.x=x;
-    command.y=y;
-    command.theta=theta;
-    commander.publish(command);
-  }
+  BaseTrajectoryAction server(nh);
+  
+  ROS_INFO("BaseTrajectoryAction is up and running.");
+  
+  ros::spin();
   
   return 0;
 }

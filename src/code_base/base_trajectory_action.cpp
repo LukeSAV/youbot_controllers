@@ -26,10 +26,10 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 #include <youbot_controllers/base_trajectory_action.h>
 #include <geometry_msgs/Pose2D.h>
 
-#include <brics_actuator/JointPositions.h>
-#include <brics_actuator/JointVelocities.h>
+/*#include <brics_actuator/JointPositions.h>
+#include <brics_actuator/JointVelocities.h>*/
 
-#include <kdl/trajectory_composite.hpp>
+/*#include <kdl/trajectory_composite.hpp>
 #include <kdl/trajectory_segment.hpp>
 #include <kdl/velocityprofile_spline.hpp>
 #include <kdl/path_line.hpp>
@@ -39,20 +39,36 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 #include <boost/units/conversion.hpp>
 #include <boost/units/systems/si/length.hpp>
 #include <boost/units/systems/si/plane_angle.hpp>
-#include <boost/units/systems/si/angular_velocity.hpp>
-
-#include <control_msgs/FollowBaseTrajectoryActionResult.h>
+#include <boost/units/systems/si/angular_velocity.hpp>*/
 
 
-BaseTrajectoryAction::BaseTrajectoryAction( ros::NodeHandle& _nh, std::string _base_link_name, std::string _base_control_ns ) :
-  use_position_commands_(true),ignore_time_(true),no_interpolation_(true), nh_(_nh),  base_link_name_(_base_link_name), base_control_ns_(_base_control_ns)
+
+BaseTrajectoryAction::BaseTrajectoryAction( ros::NodeHandle& _nh ) :
+  use_position_commands_(true),ignore_time_(true),no_interpolation_(true),has_active_goal_(false),nh_(_nh)
 {
-    setFrequency(50);
-    commander_ = nh_.advertise<geometry_msgs::Pose2D>("/"+base_control_ns_+"/position_command", 1);
-    
-    // starts up a simple trajectory server instance
-    trajectory_server_ = boost::shared_ptr<Server>( new Server("/"+base_control_ns_+"/follow_joint_trajectory", boost::bind(&BaseTrajectoryAction::executeActionServer, this, _1, trajectory_server_), false) );
-    trajectory_server_->start();
+  setFrequency(50);
+  
+  if( !nh_.getParam("/youbot_base/base_controller_ns", base_control_ns_ ) )
+  {
+    ROS_INFO("BaseTrajectoryAction couldn't find youbot_base/base_controller_ns parameter on the parameter server. The default (base_controller) will be used.");
+    base_control_ns_ = "base_controller";
+  }
+  if( !nh_.getParam("/youbot_base/base_name", base_link_name_ ) )
+  {
+    ROS_FATAL("BaseTrajectoryAction couldn't be initialized because no youbot_base/base_name parameters was found on parameter server. Shutting down the node.");
+    ros::shutdown();
+    return;
+  }
+  
+  commander_ = nh_.advertise<geometry_msgs::Pose2D>("/"+base_control_ns_+"/position_command", 1);
+  
+  // starts up a simple trajectory server instance
+  trajectory_server_ = boost::shared_ptr<Server>( new Server(nh_,
+						  "/"+base_control_ns_+"/follow_joint_trajectory", 
+						  boost::bind(&BaseTrajectoryAction::goalCallback, this, _1), 
+						  boost::bind(&BaseTrajectoryAction::cancelCallback, this, _1), 
+						  false) );
+  trajectory_server_->start();
 }
 
 BaseTrajectoryAction::~BaseTrajectoryAction()
@@ -60,12 +76,36 @@ BaseTrajectoryAction::~BaseTrajectoryAction()
 
 }
 
-void BaseTrajectoryAction::executeActionServer(const control_msgs::FollowJointTrajectoryGoalConstPtr& _goal, Server* _as)
+void BaseTrajectoryAction::goalCallback( GoalHandle _goal )
 {
-  execute(goal, trajectory_server_);
+  if (has_active_goal_)
+  {
+    active_goal_.setCanceled();
+    has_active_goal_ = false;
+  }
+  _goal.setAccepted();
+  active_goal_ = _goal;
+  has_active_goal_ = true;
+  
+  execute( _goal.getGoal() );
 }
 
-void BaseTrajectoryAction::execute(const control_msgs::FollowJointTrajectoryGoalConstPtr& goal, Server* as)
+void BaseTrajectoryAction::cancelCallback(GoalHandle _goal)
+{
+  if( active_goal_==_goal )
+  {
+    geometry_msgs::Pose2D command;
+    command.x=0;
+    command.y=0;
+    command.theta=0;
+    commander_.publish(command);
+    
+    active_goal_.setCanceled();
+    has_active_goal_ = false;
+  }
+}
+
+void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoalConstPtr& goal )
 {
 
     /* unused: unnecessary without error calculations, reenable if using controlLoop/calculateVelocity
@@ -75,14 +115,14 @@ void BaseTrajectoryAction::execute(const control_msgs::FollowJointTrajectoryGoal
     current_state.effort.resize(current_state.name.size());
     */
 
-    sensor_msgs::JointState angle1;
-    /*angle1.name = goal->trajectory.joint_names; // unused
+    /*sensor_msgs::JointState angle1;
+    angle1.name = goal->trajectory.joint_names; // unused
     angle1.position.resize(angle1.name.size());
     angle1.velocity.resize(angle1.name.size());
     angle1.effort.resize(angle1.name.size());
-*/
+
     sensor_msgs::JointState angle2;
-    /*angle2.name = goal->trajectory.joint_names; // unused
+    angle2.name = goal->trajectory.joint_names; // unused
     angle2.position.resize(angle2.name.size());
     angle2.velocity.resize(angle2.name.size());
     angle2.effort.resize(angle2.name.size());
@@ -90,7 +130,7 @@ void BaseTrajectoryAction::execute(const control_msgs::FollowJointTrajectoryGoal
     const uint numberOfJoints = goal->trajectory.joint_names.size();//current_state.name.size();
     const double dt = 1.0 / getFrequency();
     
-    if( false&&!no_interpolation_ ) //interpolation has not been matched to base joint
+    /*if( false&&!no_interpolation_ ) //interpolation has not been matched to base joint
     {
       
       KDL::Trajectory_Composite trajectoryComposite[numberOfJoints];
@@ -118,7 +158,7 @@ void BaseTrajectoryAction::execute(const control_msgs::FollowJointTrajectoryGoal
       ros::Time startTime = ros::Time::now();
 
       for (double time = 0; time <= trajectoryComposite[0].Duration(); time = time + dt)
-      {
+      {*/
 	  /* // uh-uh (imho control loops are the task of the PID controller!)
 	  controlLoop(current_state.position,
 		      current_state.velocity,
@@ -129,7 +169,7 @@ void BaseTrajectoryAction::execute(const control_msgs::FollowJointTrajectoryGoal
 	  */
 	  
 	  // using velocity commands
-	  if( !use_position_commands_ )
+	  /*if( !use_position_commands_ )
 	  {
 	    getAllCurrentVelocities( trajectoryComposite, numberOfJoints, startTime, time, target_values );
 		    
@@ -173,7 +213,7 @@ void BaseTrajectoryAction::execute(const control_msgs::FollowJointTrajectoryGoal
       }
     }
     else
-    {
+    {*/
       unsigned int next_trajectory_point = 0;
       for (double time = 0; time <= (goal->trajectory.points.back().time_from_start.toSec()+dt); time = time + dt)
       {
@@ -210,7 +250,7 @@ void BaseTrajectoryAction::execute(const control_msgs::FollowJointTrajectoryGoal
 	
 	ros::Duration(dt).sleep();
       }
-    }
+    /*}*/
 
     // to ensure that at the end of the trajectory the robot is at the goal state, they issue a position command for that last state (especially for velocity control)
     sensor_msgs::JointState goal_state;
@@ -221,17 +261,17 @@ void BaseTrajectoryAction::execute(const control_msgs::FollowJointTrajectoryGoal
 
     for (uint j = 0; j < numberOfJoints; j++)
     {
-        if( goal->trajectory.joint_names[j]==(base_link_name_+"/x") )
+        if( goal_state.name[j]==(base_link_name_+"/x") )
 	{
-	  command.x = goal->trajectory.points[next_trajectory_point].positions[j];
+	  command.x = goal_state.position[j];
 	}
-	else if( goal->trajectory.joint_names[j]==(base_link_name_+"/y") )
+	else if( goal_state.name[j]==(base_link_name_+"/y") )
 	{
-	  command.y = goal->trajectory.points[next_trajectory_point].positions[j];
+	  command.y = goal_state.position[j];
 	}
-	else if( goal->trajectory.joint_names[j]==(base_link_name_+"/theta") )
+	else if( goal_state.name[j]==(base_link_name_+"/theta") )
 	{
-	  command.theta = goal->trajectory.points[next_trajectory_point].positions[j];
+	  command.theta = goal_state.position[j];
 	}
     }
 
@@ -239,7 +279,8 @@ void BaseTrajectoryAction::execute(const control_msgs::FollowJointTrajectoryGoal
         
     control_msgs::FollowJointTrajectoryResult result;
     result.error_code = control_msgs::FollowJointTrajectoryResult::SUCCESSFUL;
-    as->setSucceeded(result);
+    active_goal_.setSucceeded(result);
+    has_active_goal_ = false;
     return;    
 }
 
@@ -273,7 +314,7 @@ void BaseTrajectoryAction::ignoreTime()
   ignore_time_ = true;
 }
 
-double BaseTrajectoryAction::getVelocityAtTime( const KDL::Trajectory_Composite& trajectoryComposite,
+/*double BaseTrajectoryAction::getVelocityAtTime( const KDL::Trajectory_Composite& trajectoryComposite,
                              double elapsedTimeInSec)
 {
 
@@ -389,40 +430,4 @@ void BaseTrajectoryAction::setTargetTrajectory(double angle1,
 
     KDL::Trajectory_Segment* trajectorySegment = new KDL::Trajectory_Segment(path, velprof);
     trajectoryComposite.Add(trajectorySegment);
-}
-
-void BaseTrajectoryAction::jointStateCallback(const sensor_msgs::JointState& joint_state)
-{
-  return;
-    int k = joint_state.name.size();
-    
-    if( k>current_state.name.size() )
-    {
-      current_state.name.resize(k);
-      current_state.position.resize(k);
-      current_state.velocity.resize(k);
-    }
-    //int k = current_state.name.size();
-    
-    if (k != 0)
-    {
-        for (uint i = 0; i < joint_state.name.size(); i++)
-        {
-            for (uint j = 0; j < current_state.name.size(); j++)
-            {
-                if (current_state.name.at(j) == joint_state.name.at(i))
-                {
-                    current_state.position[j] = joint_state.position.at(i);
-		    current_state.velocity[j] = joint_state.velocity.at(i);
-                    k--;
-                    break;
-                }
-            }
-            if (k == 0)
-            {
-                break;
-            }
-        }
-    }
-}
-
+}*/
