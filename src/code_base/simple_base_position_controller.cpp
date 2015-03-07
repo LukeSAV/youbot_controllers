@@ -51,6 +51,12 @@ SimpleBasePositionController::SimpleBasePositionController(ros::NodeHandle &_nh)
     ros::shutdown();
     return;
   }
+  else
+  {
+    base_x_name_ = base_name_+"/x";
+    base_y_name_ = base_name_+"/y";
+    base_theta_name_ = base_name_+"/theta";
+  }
   if( !nh_.getParam("/youbot_base/publish_base_state", publish_state_ ) )
   {
     ROS_INFO("SimpleBasePositionController could'nt find a youbot_base/publish_base_state parameter on the parameter server. State will be published.");
@@ -243,7 +249,12 @@ SimpleBasePositionController::PlanarPosition SimpleBasePositionController::getBa
   PlanarPosition state;
   state.x = _transform.getOrigin().x();
   state.y = _transform.getOrigin().y();
-  state.theta = _transform.inverse().getRotation().getAngle();
+  //state.theta = _transform.inverse().getRotation().getAngle(); // transform probably finds the shorter
+  tf::Quaternion rot = _transform.getRotation();
+  if( rot.z()>=0 )
+    state.theta = 2*acos(rot.w());
+  else
+    state.theta = 2*acos(-rot.w());
   return state;
 }
 
@@ -347,7 +358,7 @@ void SimpleBasePositionController::update( const ros::Time& _time, const ros::Du
     double dist_error = velocity_dir_global.length();
     double lin_speed_command = fabs(pid_pos_.computeCommand( dist_error, period ));
     double ang_speed_command = pid_theta_.computeCommand( pos_error.theta, period );
-    
+        
     cout<<endl<<"transformed commanded speed in pos is: "<<lin_speed_command;
     cout<<endl<<"transformed commanded speed in theta is: "<<ang_speed_command;
     
