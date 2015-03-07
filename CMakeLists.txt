@@ -5,16 +5,21 @@ project(youbot_controllers)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  angles
   brics_actuator
   roscpp
   sensor_msgs
   geometry_msgs
   tf
+  control_toolbox
 )
+
+## System dependencies are found with CMake's conventions
+find_package(Boost REQUIRED COMPONENTS system )
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp sensor_msgs brics_actuator
+  CATKIN_DEPENDS roscpp sensor_msgs brics_actuator angles control_toolbox
 )
 
 include_directories(include
@@ -38,4 +43,5 @@ src/code_base/simple_base_position_controller.cpp
 
 target_link_libraries(simple_base_controller
   ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
 )

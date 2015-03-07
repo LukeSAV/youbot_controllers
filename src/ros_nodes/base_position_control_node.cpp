@@ -21,7 +21,16 @@ int main(int argc, char** argv)
   //init the ROS node
   ros::init(argc, argv, "robot_driver");
   ros::NodeHandle nh;
+  
+  double x,y,theta;
+  
+  nh.getParam("/youbot_base/x", x );
+  nh.getParam("/youbot_base/y", y );
+  nh.getParam("/youbot_base/theta", theta );
 
   SimpleBasePositionController driver(nh);
-  driver.driveForwardOdom(0.5);
+  driver.setCommand(x,y,theta);
+  driver.start();
+  
+  return 0;
 }

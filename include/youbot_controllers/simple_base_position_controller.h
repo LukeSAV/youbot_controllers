@@ -26,33 +26,87 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 #include <control_toolbox/pid.h>
 #include <sensor_msgs/JointState.h>
 
+#include <boost/thread/mutex.hpp>
+
 class SimpleBasePositionController
 {
 public:
   
+  struct PlanarPosition
+  {
+    double x;
+    double y;
+    double theta;
+  };
+  
+  struct PlanarVelocity
+  {
+    double dx;
+    double dy;
+    double dtheta;
+  };
+  
   /// to store position and velocity commands
    struct Commands
   {
-    double x_; // Last commanded position
-    double y_;
-    double theta_;
-    double x_vel_;
-    double y_vel_;
-    double theta_vel_;
-    bool has_velocity_; // false if no velocity command has been specified
+    PlanarPosition position;
+    PlanarVelocity velocity;
+    bool has_velocity; // false if no velocity command has been specified
   };
   
   /** class constructor, also initializes the class, loads parameters from parameter server
    */
-  SimpleBasePositionController(ros::NodeHandle &nh);
+  SimpleBasePositionController(ros::NodeHandle &_nh);
+  
+  /** destructor
+   */
+  ~SimpleBasePositionController();
+  
+  /** starts loop that keeps updating */
+  void start();
   
   /** Give set position of the joint for next update
    */
-  void setCommand(double x, double y, double theta);
+  void setCommand(double _x, double _y, double _theta);
   
-  /** Issues commands to the joint. Should be called at regular intervals
-  */
-  void update(const ros::Time& time, const ros::Duration& period);
+  /** Give set position of the joint for next update
+   */
+  void setCommand( PlanarPosition _commanded_pos );
+  
+  /** returns current transform from robot base_frame to world position_frame (how entities would be transformed)
+   */
+  tf::StampedTransform getCurrentTransform();
+  
+  /** returns the robot state associated with the passed transform from base_frame to world position_frame  (how entities would be transformed)
+   */
+  PlanarPosition getBaseState( tf::StampedTransform& _transform );
+  
+  /** enforces that velocities are in a feasible range */
+  void enforceVelocityLimits( PlanarVelocity& _velocity );
+  
+  /** enforces limits on _value -> helper function for enforceVelocityLimits(...) */
+  void singleVelLimitEnforcer( double& _value, std::pair<double,double>& _bounds, std::pair<double,double>& _feasibility_limits, double _feasibility_threshold );
+  
+  /** enforces space limits if they have been set */
+  void enforceSpaceLimits( PlanarPosition& _position );
+  
+  /** initializes the position command to the current position and resets the pid controller */
+  void init();
+  
+  /** Issues commands to the joint and should thus be called at regular intervals
+   * @param _time time of the update
+   * @param _period time since last update
+   */
+  void update( const ros::Time& _time, const ros::Duration& _period );
+  
+  /** issues a command message for the base and publishes state information if activated
+   * @param _base_velocity new velocity for the base
+   */
+  void publishCommand( geometry_msgs::Twist _base_velocity );
+  
+  /** sends zero velocities to the youbot, telling the base to stop its movement
+   */
+  void halt();
 
   //! Drive forward a specified distance based on odometry information
   bool driveForwardOdom(double distance);
@@ -67,12 +121,35 @@ private:
   
   std::string velocity_topic_; /// where the velocity commands are published to
   std::string base_frame_; /// tf frame that represents the youbot position
-  std::string position_frame; /// tf frame that represents the world (e.g. the odometry frame)
+  std::string position_frame_; /// tf frame that represents the world (e.g. the odometry frame)
   
   bool publish_state_; /// whether the position state of the controller is published on /joint_states or not
+  ros::Time last_published_; /// when states were published last
+  ros::Duration publish_period_; /// publish period
   std::string base_name_; /// name of the "virtual base link"
+  std::string base_x_name_; /// name of the x "joint"
+  std::string base_y_name_; /// name of the y "joint"
+  std::string base_theta_name_; /// name of the theta "joint"
   
-  control_toolbox::Pid pid_controller_; /// internal PID controller
+  bool use_velocity_limits_;
+  double unfeasible_rounding_threshold_linear_;
+  double unfeasible_rounding_threshold_angular_;
+  std::pair<double,double> dx_limits_;
+  std::pair<double,double> dy_limits_;
+  std::pair<double,double> dtheta_limits_;
+  std::pair<double,double> dx_unfeasible_;
+  std::pair<double,double> dy_unfeasible_;
+  std::pair<double,double> dtheta_unfeasible_;
   
   
+  bool use_space_limits_;
+  std::pair<double,double> x_limits_;
+  std::pair<double,double> y_limits_;
+  
+  control_toolbox::Pid pid_x_; /// internal PID controller
+  control_toolbox::Pid pid_y_; /// internal PID controller
+  control_toolbox::Pid pid_theta_; /// internal PID controller
+  
+  boost::mutex command_protector_; /// to ensure that no one writes onto the command when it is read
+  Commands command_;
 };
