@@ -15,7 +15,7 @@ youbot_base:
     i: 0
     d: 0
   pid_theta:
-    p: 1
+    p: 6
     i: 0
     d: 0
   
