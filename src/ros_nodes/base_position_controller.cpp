@@ -1,3 +1,4 @@
+ 
 /* Copyright (c) 2014,2015 , Stefan Isler, islerstefan@bluewin.ch
 *
 This file is part of youbot_controllers, a ROS package providing some additional controllers for the KUKA youbot,
@@ -14,22 +15,16 @@ You should have received a copy of the GNU Lesser General Public License
 along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 */
 
+/// node starts up an instance of the SimpleBasePositionController
 #include "youbot_controllers/simple_base_position_controller.h"
-
 int main(int argc, char** argv)
 {
   //init the ROS node
   ros::init(argc, argv, "robot_driver");
   ros::NodeHandle nh;
   
-  double x,y,theta;
-  
-  nh.getParam("/youbot_base/x", x );
-  nh.getParam("/youbot_base/y", y );
-  nh.getParam("/youbot_base/theta", theta );
-
   SimpleBasePositionController driver(nh);
-  driver.setCommand(x,y,theta);
+  
   driver.start();
   
   return 0;

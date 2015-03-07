@@ -1,14 +1,13 @@
 # configuration for youbot base joint interface
 youbot_base:
-  x: 2
-  y: 4
-  theta: 0
   position_frame: odom
   base_frame: base_footprint
   velocity_topic: cmd_vel
   
   publish_base_state: true #whether the state of the base is to be published on /joint_states as if it was a joint
   publish_rate: 30 # [Hz]
+  
+  base_controller_ns: base_controller # defines the topic in which position_commands are expected
   base_name: youbot_base #name of the base, joint values are published as three joint values base_name/x base_name/y base_name/theta, following moveit conventions
   
   pid_pos:
@@ -26,28 +25,22 @@ youbot_base:
     angular: 0.03
   velocity_limits:
     upper:
-      x:
+      linear:
         min: -0.8
         max: 0.8
-      y:
-        min: -0.8
-        max: 0.8
-      theta:
+      angular:
         min: -2.86
         max: 2.86
     unfeasible:
-      x:
+      linear:
         neg: -0.01
         pos: 0.01
-      y:
-        neg: -0.01
-        pos: 0.01
-      theta:
+      angular:
         neg: -0.067
         pos: 0.067
       
     
-  use_space_limits: true #limit the space in which the youbot may move
+  use_space_limits: false #limit the space in which the youbot may move
   space_limits:
     x:
       min: -5

@@ -5,6 +5,6 @@
   <!-- upload camera and checkerboard parameters -->
   <rosparam file="$(find youbot_controllers)/config/base_joint_link_config.yaml" command="load" ns=""/>
     
-  <node name="simple_base_controller" pkg="youbot_controllers" type="simple_base_controller" respawn="false" output="screen"/>
+  <node name="base_position_controller" pkg="youbot_controllers" type="base_position_controller" respawn="false" output="screen"/>
   
 </launch>

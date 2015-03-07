@@ -22,6 +22,7 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Pose2D.h>
 #include <tf/transform_listener.h>
 #include <control_toolbox/pid.h>
 #include <sensor_msgs/JointState.h>
@@ -50,7 +51,7 @@ public:
    struct Commands
   {
     PlanarPosition position;
-    PlanarVelocity velocity;
+    PlanarVelocity velocity; // velocity commands are not (yet?) considered!
     bool has_velocity; // false if no velocity command has been specified
   };
   
@@ -64,6 +65,9 @@ public:
   
   /** starts loop that keeps updating */
   void start();
+  
+  /** executes the update step - convenience function that does the timing itself */
+  void doUpdate();
   
   /** Give set position of the joint for next update
    */
@@ -82,9 +86,6 @@ public:
   PlanarPosition getBaseState( tf::StampedTransform& _transform );
   
   /** enforces that velocities are in a feasible range */
-  void enforceVelocityLimits( PlanarVelocity& _velocity );
-  
-  /** enforces limits on _value -> helper function for enforceVelocityLimits(...) */
   void singleVelLimitEnforcer( double& _value, std::pair<double,double>& _bounds, std::pair<double,double>& _feasibility_limits, double _feasibility_threshold );
   
   /** enforces space limits if they have been set */
@@ -97,7 +98,7 @@ public:
    * @param _time time of the update
    * @param _period time since last update
    */
-  void update( const ros::Time& _time, const ros::Duration& _period );
+  void update( const ros::Time& _time, const ros::Duration& _period=ros::Duration() );
   
   /** issues a command message for the base and publishes state information if activated
    * @param _base_velocity new velocity for the base
@@ -107,18 +108,19 @@ public:
   /** sends zero velocities to the youbot, telling the base to stop its movement
    */
   void halt();
-
-  //! Drive forward a specified distance based on odometry information
-  bool driveForwardOdom(double distance);
   
-  /// Turns robot a specified amount of radians
-  bool turnOdom(bool clockwise, double radians);
+  /** position command callback */
+  void positionCommandCallback( const geometry_msgs::Pose2DConstPtr& _position_command );
 private:
   ros::NodeHandle nh_; /// ROS node handle 
   ros::Publisher velocity_commander_; /// velocity command publisher
   ros::Publisher state_publisher_; /// publishes the "state" of the base relative to the odometry frame
+  ros::Subscriber position_commands_; /// subscribes to base_controller_ns/position_command topic
   tf::TransformListener listener_; /// TF transform listener
   
+  ros::Time last_update_; /// the time of the last update call - initializes through the init() call
+  
+  std::string base_controller_ns_; /// name of the nodes namespace when expecting commands, default is "base_controller"
   std::string velocity_topic_; /// where the velocity commands are published to
   std::string base_frame_; /// tf frame that represents the youbot position
   std::string position_frame_; /// tf frame that represents the world (e.g. the odometry frame)
@@ -134,18 +136,17 @@ private:
   bool use_velocity_limits_;
   double unfeasible_rounding_threshold_linear_;
   double unfeasible_rounding_threshold_angular_;
-  std::pair<double,double> dx_limits_;
-  std::pair<double,double> dy_limits_;
-  std::pair<double,double> dtheta_limits_;
-  std::pair<double,double> dx_unfeasible_;
-  std::pair<double,double> dy_unfeasible_;
-  std::pair<double,double> dtheta_unfeasible_;
+  std::pair<double,double> dlin_limits_; // linear velocity limits
+  std::pair<double,double> dlin_unfeasible_; // unfeasible linear velocity limits
+  std::pair<double,double> dang_limits_;
+  std::pair<double,double> dang_unfeasible_;
   
   
   bool use_space_limits_;
   std::pair<double,double> x_limits_;
   std::pair<double,double> y_limits_;
   
+  control_toolbox::Pid pid_pos_; // internal position PID controller
   control_toolbox::Pid pid_x_; /// internal PID controller
   control_toolbox::Pid pid_y_; /// internal PID controller
   control_toolbox::Pid pid_theta_; /// internal PID controller

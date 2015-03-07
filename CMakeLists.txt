@@ -36,12 +36,20 @@ target_link_libraries(arm_position_control
   ${catkin_LIBRARIES}
 )
 
-add_executable(simple_base_controller
-src/ros_nodes/base_position_control_node.cpp
+add_executable(manual_base_control
+src/ros_nodes/manual_base_position_control.cpp
+)
+
+target_link_libraries(manual_base_control
+  ${catkin_LIBRARIES}
+)
+
+add_executable(base_position_controller
+src/ros_nodes/base_position_controller.cpp
 src/code_base/simple_base_position_controller.cpp
 )
 
-target_link_libraries(simple_base_controller
+target_link_libraries(base_position_controller
   ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
 )

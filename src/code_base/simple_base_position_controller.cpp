@@ -22,6 +22,11 @@ SimpleBasePositionController::SimpleBasePositionController(ros::NodeHandle &_nh)
 {
   nh_ = _nh;
   
+  if( !nh_.getParam("/youbot_base/base_controller_ns", base_controller_ns_ ) )
+  {
+    ROS_INFO("SimpleBasePositionController couldn't find youbot_base/base_controller_ns parameter on the parameter server. The default (base_controller) will be used.");
+    base_controller_ns_ = "base_controller";
+  }
   if( !nh_.getParam("/youbot_base/velocity_topic", velocity_topic_ ) )
   {
     ROS_FATAL("SimpleBasePositionController couldn't be initialized because no youbot_base/velocity_topic parameters was found on parameter server. Shutting down the node.");
@@ -71,7 +76,8 @@ SimpleBasePositionController::SimpleBasePositionController(ros::NodeHandle &_nh)
     }
   }
   double p_pos, i_pos, d_pos;
-  if( !nh_.getParam("/youbot_base/pid_pos/p", p_pos ) ||
+  if( !pid_pos_.init( ros::NodeHandle(nh_, "/youbot_base/pid_pos") ) ||
+      !nh_.getParam("/youbot_base/pid_pos/p", p_pos ) ||
       !nh_.getParam("/youbot_base/pid_pos/i", i_pos ) ||
       !nh_.getParam("/youbot_base/pid_pos/d", d_pos )
   )
@@ -105,19 +111,15 @@ SimpleBasePositionController::SimpleBasePositionController(ros::NodeHandle &_nh)
   }
   else if( use_velocity_limits_ )
   {
-    double dx_min, dx_max, dy_min, dy_max, dtheta_min, dtheta_max, dx_feas_min, dx_feas_max, dy_feas_min, dy_feas_max, dtheta_feas_min, dtheta_feas_max;
-    if( !nh_.getParam("/youbot_base/velocity_limits/upper/x/min", dx_min ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/upper/x/max", dx_max ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/upper/y/min", dy_min ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/upper/y/max", dy_max ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/upper/theta/min", dtheta_min ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/upper/theta/max", dtheta_max ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/x/neg", dx_feas_min ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/x/pos", dx_feas_max ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/y/neg", dy_feas_min ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/y/pos", dy_feas_max ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/theta/neg", dtheta_feas_min ) || 
-        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/theta/pos", dtheta_feas_max ) ||
+    double dx_min, dx_max, dtheta_min, dtheta_max, dx_feas_min, dx_feas_max, dtheta_feas_min, dtheta_feas_max;
+    if( !nh_.getParam("/youbot_base/velocity_limits/upper/linear/min", dx_min ) || 
+        !nh_.getParam("/youbot_base/velocity_limits/upper/linear/max", dx_max ) || 
+        !nh_.getParam("/youbot_base/velocity_limits/upper/angular/min", dtheta_min ) || 
+        !nh_.getParam("/youbot_base/velocity_limits/upper/angular/max", dtheta_max ) || 
+        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/linear/neg", dx_feas_min ) || 
+        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/linear/pos", dx_feas_max ) || 
+        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/angular/neg", dtheta_feas_min ) || 
+        !nh_.getParam("/youbot_base/velocity_limits/unfeasible/angular/pos", dtheta_feas_max ) ||
         !nh_.getParam("/youbot_base/unfeasible_rounding_threshold/linear", unfeasible_rounding_threshold_linear_ ) || 
         !nh_.getParam("/youbot_base/unfeasible_rounding_threshold/angular", unfeasible_rounding_threshold_angular_ ) )
     {
@@ -127,12 +129,10 @@ SimpleBasePositionController::SimpleBasePositionController(ros::NodeHandle &_nh)
     }
     else
     {
-      dx_limits_ = std::pair<double,double>(dx_min,dx_max);
-      dy_limits_ = std::pair<double,double>(dy_min,dy_max);
-      dtheta_limits_ = std::pair<double,double>(dtheta_min,dtheta_max);
-      dx_unfeasible_ = std::pair<double,double>(dx_feas_min,dx_feas_max);
-      dy_unfeasible_ = std::pair<double,double>(dy_feas_min,dy_feas_max);
-      dtheta_unfeasible_ = std::pair<double,double>(dtheta_feas_min,dtheta_feas_max);
+      dlin_limits_ = std::pair<double,double>(dx_min,dx_max);
+      dang_limits_ = std::pair<double,double>(dtheta_min,dtheta_max);
+      dlin_unfeasible_ = std::pair<double,double>(dx_feas_min,dx_feas_max);
+      dang_unfeasible_ = std::pair<double,double>(dtheta_feas_min,dtheta_feas_max);
     }
   }
   if( !nh_.getParam("/youbot_base/use_space_limits", use_space_limits_ ) )
@@ -166,7 +166,6 @@ SimpleBasePositionController::SimpleBasePositionController(ros::NodeHandle &_nh)
     }
   }
   
-  
   //set up the publisher for the velocity command topic
   velocity_commander_ = nh_.advertise<geometry_msgs::Twist>(velocity_topic_, 1000);
   
@@ -177,6 +176,9 @@ SimpleBasePositionController::SimpleBasePositionController(ros::NodeHandle &_nh)
   last_published_ = ros::Time::now(); // just so that it has a value assigned
   
   init();
+  
+  // start position_command subscription
+  position_commands_ = nh_.subscribe( "/"+base_controller_ns_+"/position_command", 1, &SimpleBasePositionController::positionCommandCallback, this );
 }
 
 SimpleBasePositionController::~SimpleBasePositionController()
@@ -187,16 +189,20 @@ SimpleBasePositionController::~SimpleBasePositionController()
 void SimpleBasePositionController::start()
 {
   ros::Rate rate(50);
-  ros::Time last_update = ros::Time::now();
+  init();
   
   while( nh_.ok() )
   {
     rate.sleep();
-    ros::Time now = ros::Time::now();
-    ros::Duration time_passed = now - last_update;
-    last_update = now;
-    update( now, time_passed );
+    doUpdate();
+    ros::spinOnce();
   }
+}
+
+void SimpleBasePositionController::doUpdate()
+{
+  ros::Time now = ros::Time::now();
+  update( now );
 }
 
 void SimpleBasePositionController::setCommand(double _x, double _y, double _theta)
@@ -241,16 +247,6 @@ SimpleBasePositionController::PlanarPosition SimpleBasePositionController::getBa
   return state;
 }
 
-void SimpleBasePositionController::enforceVelocityLimits( PlanarVelocity& _velocity )
-{
-  if( !use_velocity_limits_ )
-    return;
-  
-  singleVelLimitEnforcer( _velocity.dx, dx_limits_, dx_unfeasible_, unfeasible_rounding_threshold_linear_ );
-  singleVelLimitEnforcer( _velocity.dy, dy_limits_, dy_unfeasible_, unfeasible_rounding_threshold_linear_ );
-  singleVelLimitEnforcer( _velocity.dtheta, dtheta_limits_, dtheta_unfeasible_, unfeasible_rounding_threshold_angular_ );
-}
-
 void SimpleBasePositionController::singleVelLimitEnforcer( double& _value, std::pair<double,double>& _bounds, std::pair<double,double>& _feasibility_limits, double _feasibility_threshold )
 {
   if( _value<_bounds.first )
@@ -282,10 +278,20 @@ void SimpleBasePositionController::init()
   pid_x_.reset();
   pid_y_.reset();
   pid_theta_.reset();
+  last_update_ = ros::Time::now();
 }
 
 void SimpleBasePositionController::update( const ros::Time& _time, const ros::Duration& _period )
 {
+  
+  ros::Duration period;
+  if( _period==ros::Duration() )
+    period = _time-last_update_;
+  else
+    period = _period;
+  
+  last_update_ = _time;
+  
   // get current command
   Commands current_command;
   // possibly critical section
@@ -306,9 +312,13 @@ void SimpleBasePositionController::update( const ros::Time& _time, const ros::Du
   
   using namespace std;
   cout<<endl<<"x position command:"<<current_command.position.x;
+  cout<<endl<<"y position command:"<<current_command.position.y;
+  cout<<endl<<"theta position command:"<<current_command.position.theta;
   cout<<endl<<"current x position:"<<current_position.x;
+  cout<<endl<<"current y position:"<<current_position.y;
+  cout<<endl<<"current theta position:"<<current_position.theta;
   
-  pos_error.x = 0;//current_command.position.x - current_position.x;
+  pos_error.x = current_command.position.x - current_position.x; // in global (e.g. odometry) frame
   pos_error.y = current_command.position.y - current_position.y;
   pos_error.theta = angles::shortest_angular_distance( current_position.theta, current_command.position.theta );
   
@@ -319,29 +329,55 @@ void SimpleBasePositionController::update( const ros::Time& _time, const ros::Du
   // decide which of the two PID computeCommand() methods to call
   if( current_command.has_velocity )
   {
-    // not implemented yet
+    // not implemented (yet?)
   }
   else
   {
-    // transform velocity vector from global frame to robot frame, construct command
-    double pid_com_x = pid_x_.computeCommand( pos_error.x, _period );
-    double pid_com_y = pid_y_.computeCommand( pos_error.y, _period );
-    tf::Vector3 velocity_vec_global( pid_com_x, pid_com_y, 0 );
-    tf::Quaternion velocity_vec_robot = current_transform.inverse().getRotation()*velocity_vec_global;
-    control_command.dx = velocity_vec_robot.x();
-    control_command.dy = velocity_vec_robot.y();
-    control_command.dtheta = pid_theta_.computeCommand( pos_error.theta, _period );
+    // direction to move to: needs to be transformed from global frame to local robot frame
+    tf::Vector3  velocity_dir_global( pos_error.x, pos_error.y, 0 );
+    tf::Transform R_rb = current_transform.inverse(); // transforming base entities to robot entities
+    R_rb.setOrigin( tf::Vector3(0,0,0) ); // want only the rotation
+    
+    tf::Vector3 velocity_dir_robot = R_rb*velocity_dir_global;
+    
+    
+    velocity_dir_robot.normalize();
+    
+    // use pid to calculate velocities
+    double dist_error = velocity_dir_global.length();
+    double lin_speed_command = fabs(pid_pos_.computeCommand( dist_error, period ));
+    double ang_speed_command = pid_theta_.computeCommand( pos_error.theta, period );
+    
+    cout<<endl<<"transformed commanded speed in pos is: "<<lin_speed_command;
+    cout<<endl<<"transformed commanded speed in theta is: "<<ang_speed_command;
+    
+    if( use_velocity_limits_ ) // enforce velocity limits
+    {
+      singleVelLimitEnforcer( lin_speed_command, dlin_limits_, dlin_unfeasible_, unfeasible_rounding_threshold_linear_ );
+      singleVelLimitEnforcer( ang_speed_command, dang_limits_, dang_unfeasible_, unfeasible_rounding_threshold_angular_ );
+    }
       
-    cout<<endl<<"pid computed commanded speed in x is: "<<pid_com_x;
-    cout<<endl<<"pid computed commanded speed in y is: "<<pid_com_y;
-    cout<<endl<<"pid computed commanded speed in theta is: "<<control_command.dtheta;
+    cout<<endl<<"transformed commanded limited speed in pos is: "<<lin_speed_command;
+    cout<<endl<<"transformed commanded limited speed in theta is: "<<ang_speed_command;
+    
+    velocity_dir_robot *= lin_speed_command;
+    
+    //double pid_com_x = pid_x_.computeCommand( pos_error.x, _period );
+    //double pid_com_y = pid_y_.computeCommand( pos_error.y, _period );
+    //tf::Vector3 velocity_vec_global( pid_com_x, pid_com_y, 0 );
+    //tf::Quaternion velocity_vec_robot = current_transform.inverse().getRotation()*velocity_vec_global;
+    
+    control_command.dx = velocity_dir_robot.x();
+    control_command.dy = velocity_dir_robot.y();
+    control_command.dtheta = ang_speed_command;
+    
+    
+    cout<<endl<<"transformed commanded limited speed in x is: "<<control_command.dx;
+    cout<<endl<<"transformed commanded limited speed in y is: "<<control_command.dy;
+    cout<<endl<<"transformed commanded limited speed in theta is: "<<ang_speed_command;
+    
   }
   
-  cout<<endl<<"transformed commanded speed in x is: "<<control_command.dx;
-  cout<<endl<<"transformed commanded speed in y is: "<<control_command.dy;
-  cout<<endl<<"transformed commanded speed in theta is: "<<control_command.dtheta;
-  // enforce velocity _bounds
-  enforceVelocityLimits(control_command);
   
   geometry_msgs::Twist control_output;
   control_output.linear.x = control_command.dx;
@@ -409,119 +445,7 @@ void SimpleBasePositionController::halt()
   publishCommand( control_output );
 }
 
-//! Drive forward a specified distance based on odometry information
-bool SimpleBasePositionController::driveForwardOdom(double distance)
+void SimpleBasePositionController::positionCommandCallback( const geometry_msgs::Pose2DConstPtr& _position_command )
 {
-  //wait for the listener to get the first message
-  listener_.waitForTransform("base_footprint", "odom", 
-			      ros::Time(0), ros::Duration(1.0));
-  
-  //we will record transforms here
-  tf::StampedTransform start_transform;
-  tf::StampedTransform current_transform;
-
-  //record the starting transform from the odometry to the base frame
-  listener_.lookupTransform("base_footprint", "odom", 
-			    ros::Time(0), start_transform);
-  
-  //we will be sending commands of type "twist"
-  geometry_msgs::Twist base_cmd;
-  //the command will be to go forward at 0.25 m/s
-  base_cmd.linear.y = base_cmd.angular.z = 0;
-  base_cmd.linear.x = 0.25;
-  
-  ros::Rate rate(10.0);
-  bool done = false;
-  while (!done && nh_.ok())
-  {
-    //send the drive command
-    velocity_commander_.publish(base_cmd);
-    rate.sleep();
-    //get the current transform
-    try
-    {
-      listener_.lookupTransform("base_footprint", "odom", 
-				ros::Time(0), current_transform);
-    }
-    catch (tf::TransformException ex)
-    {
-      ROS_ERROR("%s",ex.what());
-      break;
-    }
-    //see how far we've traveled
-    tf::Transform relative_transform = 
-      start_transform.inverse() * current_transform;
-    double dist_moved = relative_transform.getOrigin().length();
-
-    if(dist_moved > distance)
-    {
-      base_cmd.linear.x = 0;
-      velocity_commander_.publish(base_cmd);
-      done = true;
-    }
-  }
-  if (done) return true;
-  return false;
-}
-
-bool SimpleBasePositionController::turnOdom(bool clockwise, double radians)
-{
-  while(radians < 0) radians += 2*M_PI;
-  while(radians > 2*M_PI) radians -= 2*M_PI;
-
-  //wait for the listener to get the first message
-  listener_.waitForTransform("base_footprint", "odom", 
-			      ros::Time(0), ros::Duration(1.0));
-  
-  //we will record transforms here
-  tf::StampedTransform start_transform;
-  tf::StampedTransform current_transform;
-
-  //record the starting transform from the odometry to the base frame
-  listener_.lookupTransform("base_footprint", "odom", 
-			    ros::Time(0), start_transform);
-  
-  //we will be sending commands of type "twist"
-  geometry_msgs::Twist base_cmd;
-  //the command will be to turn at 0.75 rad/s
-  base_cmd.linear.x = base_cmd.linear.y = 0.0;
-  base_cmd.angular.z = 0.75;
-  if (clockwise) base_cmd.angular.z = -base_cmd.angular.z;
-  
-  //the axis we want to be rotating by
-  tf::Vector3 desired_turn_axis(0,0,1);
-  if (!clockwise) desired_turn_axis = -desired_turn_axis;
-  
-  ros::Rate rate(10.0);
-  bool done = false;
-  while (!done && nh_.ok())
-  {
-    //send the drive command
-    velocity_commander_.publish(base_cmd);
-    rate.sleep();
-    //get the current transform
-    try
-    {
-      listener_.lookupTransform("base_footprint", "odom", 
-				ros::Time(0), current_transform);
-    }
-    catch (tf::TransformException ex)
-    {
-      ROS_ERROR("%s",ex.what());
-      break;
-    }
-    tf::Transform relative_transform = 
-      start_transform.inverse() * current_transform;
-    tf::Vector3 actual_turn_axis = 
-      relative_transform.getRotation().getAxis();
-    double angle_turned = relative_transform.getRotation().getAngle();
-    if ( fabs(angle_turned) < 1.0e-2) continue;
-
-    if ( actual_turn_axis.dot( desired_turn_axis ) < 0 ) 
-      angle_turned = 2 * M_PI - angle_turned;
-
-    if (angle_turned > radians) done = true;
-  }
-  if (done) return true;
-  return false;
+  setCommand( _position_command->x, _position_command->y, _position_command->theta );
 }
