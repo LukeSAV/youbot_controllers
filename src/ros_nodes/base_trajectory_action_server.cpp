@@ -17,7 +17,7 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 #include <ros/ros.h>
 #include <youbot_controllers/base_trajectory_action.h>
 
-/** sets up a trajectory action server that can interface with the base_position_controller - the server features no cancellation means!*/
+/** sets up a trajectory action server that can interface with the base_position_controller*/
 
 int main(int argc, char** argv)
 {
