@@ -321,21 +321,20 @@ void SimpleBasePositionController::update( const ros::Time& _time, const ros::Du
   // ensure command position is inside limits
   enforceSpaceLimits(current_command.position);
   
-  using namespace std;
-  cout<<endl<<"x position command:"<<current_command.position.x;
-  cout<<endl<<"y position command:"<<current_command.position.y;
-  cout<<endl<<"theta position command:"<<current_command.position.theta;
-  cout<<endl<<"current x position:"<<current_position.x;
-  cout<<endl<<"current y position:"<<current_position.y;
-  cout<<endl<<"current theta position:"<<current_position.theta;
+  ROS_DEBUG_STREAM(std::endl<<"x position command:"<<current_command.position.x);
+  ROS_DEBUG_STREAM(std::endl<<"y position command:"<<current_command.position.y);
+  ROS_DEBUG_STREAM(std::endl<<"theta position command:"<<current_command.position.theta);
+  ROS_DEBUG_STREAM(std::endl<<"current x position:"<<current_position.x);
+  ROS_DEBUG_STREAM(std::endl<<"current y position:"<<current_position.y);
+  ROS_DEBUG_STREAM(std::endl<<"current theta position:"<<current_position.theta);
   
   pos_error.x = current_command.position.x - current_position.x; // in global (e.g. odometry) frame
   pos_error.y = current_command.position.y - current_position.y;
   pos_error.theta = angles::shortest_angular_distance( current_position.theta, current_command.position.theta );
   
-  cout<<endl<<"position error in x is: "<<pos_error.x;
-  cout<<endl<<"position error in y is: "<<pos_error.y;
-  cout<<endl<<"position error in theta is: "<<pos_error.theta;
+  ROS_DEBUG_STREAM(std::endl<<"position error in x is: "<<pos_error.x);
+  ROS_DEBUG_STREAM(std::endl<<"position error in y is: "<<pos_error.y);
+  ROS_DEBUG_STREAM(std::endl<<"position error in theta is: "<<pos_error.theta);
   
   // decide which of the two PID computeCommand() methods to call
   if( current_command.has_velocity )
@@ -359,8 +358,8 @@ void SimpleBasePositionController::update( const ros::Time& _time, const ros::Du
     double lin_speed_command = fabs(pid_pos_.computeCommand( dist_error, period ));
     double ang_speed_command = pid_theta_.computeCommand( pos_error.theta, period );
         
-    cout<<endl<<"transformed commanded speed in pos is: "<<lin_speed_command;
-    cout<<endl<<"transformed commanded speed in theta is: "<<ang_speed_command;
+    ROS_DEBUG_STREAM(std::endl<<"transformed commanded speed in pos is: "<<lin_speed_command);
+    ROS_DEBUG_STREAM(std::endl<<"transformed commanded speed in theta is: "<<ang_speed_command);
     
     if( use_velocity_limits_ ) // enforce velocity limits
     {
@@ -368,8 +367,8 @@ void SimpleBasePositionController::update( const ros::Time& _time, const ros::Du
       singleVelLimitEnforcer( ang_speed_command, dang_limits_, dang_unfeasible_, unfeasible_rounding_threshold_angular_ );
     }
       
-    cout<<endl<<"transformed commanded limited speed in pos is: "<<lin_speed_command;
-    cout<<endl<<"transformed commanded limited speed in theta is: "<<ang_speed_command;
+    ROS_DEBUG_STREAM(std::endl<<"transformed commanded limited speed in pos is: "<<lin_speed_command);
+    ROS_DEBUG_STREAM(std::endl<<"transformed commanded limited speed in theta is: "<<ang_speed_command);
     
     velocity_dir_robot *= lin_speed_command;
     
@@ -383,9 +382,9 @@ void SimpleBasePositionController::update( const ros::Time& _time, const ros::Du
     control_command.dtheta = ang_speed_command;
     
     
-    cout<<endl<<"transformed commanded limited speed in x is: "<<control_command.dx;
-    cout<<endl<<"transformed commanded limited speed in y is: "<<control_command.dy;
-    cout<<endl<<"transformed commanded limited speed in theta is: "<<ang_speed_command;
+    ROS_DEBUG_STREAM(std::endl<<"transformed commanded limited speed in x is: "<<control_command.dx);
+    ROS_DEBUG_STREAM(std::endl<<"transformed commanded limited speed in y is: "<<control_command.dy);
+    ROS_DEBUG_STREAM(std::endl<<"transformed commanded limited speed in theta is: "<<ang_speed_command);
     
   }
   
