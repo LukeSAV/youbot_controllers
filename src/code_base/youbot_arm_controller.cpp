@@ -259,7 +259,10 @@ void YoubotArmController::resetPos()
 {
   for( int i=0; i<jointNames_.size(); i++ )
   {
-    commandedPositions_[i] = jointLimits_[i].first;
+    if( i!=2)
+      commandedPositions_[i] = jointLimits_[i].first;
+    else
+      commandedPositions_[i] = jointLimits_[i].second;
   }
   publishCommand();
   return;
