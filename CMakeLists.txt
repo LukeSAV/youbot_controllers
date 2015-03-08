@@ -46,6 +46,14 @@ target_link_libraries(manual_base_control
   ${catkin_LIBRARIES}
 )
 
+add_executable(trajectory_test
+src/ros_nodes/trajectory_test.cpp
+)
+
+target_link_libraries(trajectory_test
+  ${catkin_LIBRARIES}
+)
+
 add_executable(base_position_controller
 src/ros_nodes/base_position_controller.cpp
 src/code_base/simple_base_position_controller.cpp

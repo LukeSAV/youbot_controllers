@@ -24,7 +24,7 @@ int main(int argc, char** argv)
   using namespace std;
   
   //init the ROS node
-  ros::init(argc, argv, "robot_driver");
+  ros::init(argc, argv, "base_trajectory_action_server");
   ros::NodeHandle nh;
     
   BaseTrajectoryAction server(nh);

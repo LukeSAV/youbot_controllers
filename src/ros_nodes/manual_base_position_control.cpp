@@ -17,6 +17,10 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 #include <ros/ros.h>
 #include <geometry_msgs/Pose2D.h>
 
+#include <actionlib/client/simple_action_client.h>
+#include <control_msgs/FollowJointTrajectoryAction.h>
+typedef actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> Client;
+
 /** node that expects 2d pose input on the command line from the user and sends it to a base_position_controller */
 
 int main(int argc, char** argv)
@@ -24,9 +28,9 @@ int main(int argc, char** argv)
   using namespace std;
   
   //init the ROS node
-  ros::init(argc, argv, "robot_driver");
+  ros::init(argc, argv, "manual_base_position_control");
   ros::NodeHandle nh;
-  
+    
   ros::Publisher commander = nh.advertise<geometry_msgs::Pose2D>("/base_controller/position_command",1);
   
   double x,y,theta;

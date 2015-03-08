@@ -20,7 +20,7 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 int main(int argc, char** argv)
 {
   //init the ROS node
-  ros::init(argc, argv, "robot_driver");
+  ros::init(argc, argv, "base_position_controller");
   ros::NodeHandle nh;
   
   SimpleBasePositionController driver(nh);
