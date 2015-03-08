@@ -83,6 +83,7 @@ void BaseTrajectoryAction::goalCallback( GoalHandle _goal )
     active_goal_.setCanceled();
     has_active_goal_ = false;
   }
+  std::cout<<std::endl<<std::endl<<"I got a task to do!!!"<<std::endl;
   _goal.setAccepted();
   active_goal_ = _goal;
   has_active_goal_ = true;

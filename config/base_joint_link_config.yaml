@@ -4,7 +4,7 @@ youbot_base:
   base_frame: base_footprint
   velocity_topic: cmd_vel
   
-  publish_base_state: true #whether the state of the base is to be published on /joint_states as if it was a joint
+  publish_base_state: false #whether the state of the base is to be published on /joint_states as if it was a joint
   publish_rate: 50 # [Hz]
   
   base_controller_ns: base_controller # defines the topic in which position_commands are expected
