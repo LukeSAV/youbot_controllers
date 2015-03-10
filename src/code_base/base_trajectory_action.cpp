@@ -44,7 +44,7 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 
 
 BaseTrajectoryAction::BaseTrajectoryAction( ros::NodeHandle& _nh ) :
-  use_position_commands_(true),ignore_time_(true),no_interpolation_(true),has_active_goal_(false),nh_(_nh)
+  use_position_commands_(true),ignore_time_(true),no_interpolation_(true),has_active_goal_(false),nh_(_nh),is_executing_(false),stop_executing_(false)
 {
   setFrequency(50);
   
@@ -82,6 +82,16 @@ void BaseTrajectoryAction::goalCallback( GoalHandle _goal )
   {
     active_goal_.setCanceled();
     has_active_goal_ = false;
+    
+    ros::AsyncSpinner spinner(1);
+    spinner.start();
+    stop_executing_ = true;
+    while( is_executing_ )
+    {
+      ros::Duration(0.001).sleep();
+    }
+    spinner.stop();
+    stop_executing_ = false;
   }
   _goal.setAccepted();
   active_goal_ = _goal;
@@ -94,6 +104,16 @@ void BaseTrajectoryAction::cancelCallback(GoalHandle _goal)
 {
   if( active_goal_==_goal )
   {
+    ros::AsyncSpinner spinner(1);
+    spinner.start();
+    stop_executing_ = true;
+    while( is_executing_ )
+    {
+      ros::Duration(0.001).sleep();
+    }
+    spinner.stop();
+    stop_executing_ = false;
+    
     geometry_msgs::Pose2D command;
     command.x=0;
     command.y=0;
@@ -107,7 +127,8 @@ void BaseTrajectoryAction::cancelCallback(GoalHandle _goal)
 
 void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoalConstPtr& goal )
 {
-
+  ROS_INFO("Received new trajectory execution task. Executing...");
+  is_executing_ = true;
     /* unused: unnecessary without error calculations, reenable if using controlLoop/calculateVelocity
     current_state.name = goal->trajectory.joint_names;
     current_state.position.resize(current_state.name.size());
@@ -219,7 +240,13 @@ void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoa
       {
 	if( time >= goal->trajectory.points[next_trajectory_point].time_from_start.toSec() ) // about time to send next position command -> can never follow the set time since this point should at least already be reached now
 	{
-	  
+	  ros::spinOnce();
+	  if( stop_executing_ )
+	  {
+	    is_executing_ = false;
+	    ROS_INFO("Execution aborted.");
+	    return;
+	  }
 	  geometry_msgs::Pose2D command;
 	  
 	  
@@ -281,6 +308,8 @@ void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoa
     result.error_code = control_msgs::FollowJointTrajectoryResult::SUCCESSFUL;
     active_goal_.setSucceeded(result);
     has_active_goal_ = false;
+    is_executing_ = false;
+    ROS_INFO("Finished execution");
     return;    
 }
 

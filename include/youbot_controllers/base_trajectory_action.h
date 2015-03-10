@@ -77,6 +77,8 @@ private:
     ros::NodeHandle nh_;
     
     bool has_active_goal_;
+    bool is_executing_; // currently executing trajectory
+    bool stop_executing_; // stop execution of trajectory if executing
     GoalHandle active_goal_;
     boost::shared_ptr<Server> trajectory_server_;
     std::string base_link_name_; /// name of the base link
