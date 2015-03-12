@@ -19,6 +19,7 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 
 //! ROS node initialization
 SimpleBasePositionController::SimpleBasePositionController(ros::NodeHandle &_nh)
+  : listener_(_nh)
 {
   nh_ = _nh;
   
@@ -234,6 +235,7 @@ tf::StampedTransform SimpleBasePositionController::getCurrentTransform()
   {
     ROS_WARN_STREAM("Cannot get current state of youbot, missing tf transform from "<<position_frame_<<" to "<<base_frame_<<". Stopping the youbot for safety purposes while waiting.");
     halt();
+    now = ros::Time::now();
   }
   
   tf::StampedTransform current_transform;
