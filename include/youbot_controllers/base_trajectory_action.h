@@ -35,6 +35,8 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 #include <actionlib/server/action_server.h>
 #include <brics_actuator/JointPositions.h>
 #include <brics_actuator/JointVelocities.h>
+#include <tf/transform_listener.h>
+#include <geometry_msgs/Pose2D.h>
 
 // still quite a mess, this is just a fast fix to get the job done
 
@@ -63,18 +65,26 @@ public:
     void setFrequency(double frequency);
     double getFrequency() const;
 
-    // tells the BaseTrajectoryAction class to use position commands when following a trajectory: velocity and/or accelerations in the trajectory are not considered
+    /// tells the BaseTrajectoryAction class to use position commands when following a trajectory: velocity and/or accelerations in the trajectory are not considered
     void usePositionCommands();
     
-    // tells the BaseTrajectoryAction class to use velocity commands when following a trajectory: currently the velocities are being recalculated using the KDL library and the positions in the trajectory while discarding velocities and/or accelerations, you might want to change that and do interpolations using the velocities in the trajectory if you want to use the class with velocity commands (Velocity and torque commands weren't necessary for the task for which the class has been revised since timing was of no interest, thus this wasn't done) -> check the getAllCurrentVelocities(...) function
+    /// tells the BaseTrajectoryAction class to use velocity commands when following a trajectory: currently the velocities are being recalculated using the KDL library and the positions in the trajectory while discarding velocities and/or accelerations, you might want to change that and do interpolations using the velocities in the trajectory if you want to use the class with velocity commands (Velocity and torque commands weren't necessary for the task for which the class has been revised since timing was of no interest, thus this wasn't done) -> check the getAllCurrentVelocities(...) function
     void useVelocityCommands();
     
-    // sets ignore_time_ to false
+    /// sets ignore_time_ to false
     void dontIgnoreTime();
-    // sets ignore_time to true
+    /// sets ignore_time to true
     void ignoreTime();
+    
+    /// get current state of the base
+    /**
+     * @param _current_state current state of the robot
+     * @return true iff a current state could be retrieved within 100ms, false if not
+     */
+    bool getCurrentBaseState( geometry_msgs::Pose2D& _current_state );
 private:
     ros::NodeHandle nh_;
+    tf::TransformListener tf_listener_;
     
     bool has_active_goal_;
     bool is_executing_; // currently executing trajectory
@@ -82,8 +92,11 @@ private:
     GoalHandle active_goal_;
     boost::shared_ptr<Server> trajectory_server_;
     std::string base_link_name_; /// name of the base link
+    std::string base_planning_frame_; /// name of the tf frame relative to which the base position is being controlled
     std::string base_control_ns_; /// name of the ns in which the position_command topic exists
     ros::Publisher commander_; /// commands 
+    
+    double x_pos_tolerance_, y_pos_tolerance_, theta_pos_tolerance_;
   
     bool use_position_commands_; /// if true then only the positions of the trajectory are used, otherwise the velocities will be used - default is true
     bool ignore_time_; /// if true then each point in the trajectory will be commanded with no regard to the the time in the trajectory. Currently defaults to true because accurate trajectory following was desired and timing was of no interest for the task at hand for which this class was revised

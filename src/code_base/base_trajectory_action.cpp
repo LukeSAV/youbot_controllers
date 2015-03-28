@@ -24,7 +24,6 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <youbot_controllers/base_trajectory_action.h>
-#include <geometry_msgs/Pose2D.h>
 
 /*#include <brics_actuator/JointPositions.h>
 #include <brics_actuator/JointVelocities.h>*/
@@ -43,8 +42,14 @@ along with youbot_controllers. If not, see <http://www.gnu.org/licenses/>.
 
 
 
-BaseTrajectoryAction::BaseTrajectoryAction( ros::NodeHandle& _nh ) :
-  use_position_commands_(true),ignore_time_(true),no_interpolation_(true),has_active_goal_(false),nh_(_nh),is_executing_(false),stop_executing_(false)
+BaseTrajectoryAction::BaseTrajectoryAction( ros::NodeHandle& _nh )
+  : use_position_commands_(true)
+  , ignore_time_(true)
+  , no_interpolation_(true)
+  , has_active_goal_(false)
+  , nh_(_nh),is_executing_(false)
+  , stop_executing_(false)
+  , tf_listener_(_nh)
 {
   setFrequency(50);
   
@@ -55,7 +60,13 @@ BaseTrajectoryAction::BaseTrajectoryAction( ros::NodeHandle& _nh ) :
   }
   if( !nh_.getParam("/youbot_base/base_name", base_link_name_ ) )
   {
-    ROS_FATAL("BaseTrajectoryAction couldn't be initialized because no youbot_base/base_name parameters was found on parameter server. Shutting down the node.");
+    ROS_FATAL("BaseTrajectoryAction couldn't be initialized because no youbot_base/base_name parameter was found on parameter server. Shutting down the node.");
+    ros::shutdown();
+    return;
+  }
+  if( !nh_.getParam("/youbot_base/position_frame", base_planning_frame_ ) )
+  {
+    ROS_FATAL("BaseTrajectoryAction couldn't be initialized because no youbot_base/position_frame parameter was found on parameter server. Shutting down the node.");
     ros::shutdown();
     return;
   }
@@ -128,6 +139,25 @@ void BaseTrajectoryAction::cancelCallback(GoalHandle _goal)
 void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoalConstPtr& goal )
 {
   ROS_INFO("Received new trajectory execution task. Executing...");
+  
+  // load goal tolerances if any
+  for(unsigned int i=0; i<goal->goal_tolerance.size(); ++i)
+  {
+    if( goal->goal_tolerance[i].name == base_link_name_+"/x" )
+    {
+      x_pos_tolerance_ = goal->goal_tolerance[0].position;
+    }
+    else if( goal->goal_tolerance[i].name == base_link_name_+"/y" )
+    {
+      y_pos_tolerance_ = goal->goal_tolerance[1].position;
+    }
+    else if( goal->goal_tolerance[i].name == base_link_name_+"/theta" )
+    {
+      theta_pos_tolerance_ = goal->goal_tolerance[2].position;
+    }
+  }
+  
+  
   is_executing_ = true;
     /* unused: unnecessary without error calculations, reenable if using controlLoop/calculateVelocity
     current_state.name = goal->trajectory.joint_names;
@@ -303,8 +333,37 @@ void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoa
     }
 
     commander_.publish(command);
-        
+    
+    // wait for robot to succeed with the movement
+            
     control_msgs::FollowJointTrajectoryResult result;
+    
+    ros::Duration max_wait_time(5.0); // 5s wait time max until completion must be reached
+    ros::Time start = ros::Time::now();
+    
+    while(true)
+    {
+      geometry_msgs::Pose2D current_state;
+      getCurrentBaseState(current_state);
+      
+      if( fabs(current_state.x-command.x)<=x_pos_tolerance_ &&
+	  fabs(current_state.y-command.y)<=y_pos_tolerance_ &&
+	  fabs(current_state.theta-command.theta)<=theta_pos_tolerance_
+      )
+	break;
+	
+      else if( ros::Time::now() >= (start+max_wait_time) )
+      {
+	result.error_code = control_msgs::FollowJointTrajectoryResult::GOAL_TOLERANCE_VIOLATED;
+	active_goal_.setAborted(result);
+	has_active_goal_ = false;
+	is_executing_ = false;
+	ROS_INFO("Reached position was not within given goal tolerance in the given time");
+	return;
+      }
+    }
+    
+    
     result.error_code = control_msgs::FollowJointTrajectoryResult::SUCCESSFUL;
     active_goal_.setSucceeded(result);
     has_active_goal_ = false;
@@ -341,6 +400,28 @@ void BaseTrajectoryAction::dontIgnoreTime()
 void BaseTrajectoryAction::ignoreTime()
 {
   ignore_time_ = true;
+}
+
+bool BaseTrajectoryAction::getCurrentBaseState( geometry_msgs::Pose2D& _current_state )
+{
+  ros::Time now = ros::Time::now();
+  bool got_transform = tf_listener_.waitForTransform( base_planning_frame_, base_link_name_, now, ros::Duration(0.1) );
+  
+  if(!got_transform)
+    return false;
+  
+  tf::StampedTransform curr_base_pos;
+  tf_listener_.lookupTransform( base_planning_frame_, base_link_name_, now, curr_base_pos );
+  
+  _current_state.x = curr_base_pos.getOrigin().x();
+  _current_state.y = curr_base_pos.getOrigin().y();
+  tf::Quaternion rot = curr_base_pos.getRotation();
+  if( rot.z()>=0)
+    _current_state.theta = 2*acos(rot.w());
+  else
+    _current_state.theta = 2*acos(-rot.w());
+  
+  
 }
 
 /*double BaseTrajectoryAction::getVelocityAtTime( const KDL::Trajectory_Composite& trajectoryComposite,
