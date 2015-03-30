@@ -346,9 +346,13 @@ void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoa
       geometry_msgs::Pose2D current_state;
       getCurrentBaseState(current_state);
       
-      if( fabs(current_state.x-command.x)>x_pos_tolerance_ &&
-	  fabs(current_state.y-command.y)>y_pos_tolerance_ &&
-	  fabs(current_state.theta-command.theta)>theta_pos_tolerance_
+      double x_error = fabs(current_state.x-command.x);
+      double y_error = fabs(current_state.y-command.y);
+      double theta_error = fabs(current_state.theta-command.theta);
+      
+      if( x_error>x_pos_tolerance_ &&
+	  y_error>y_pos_tolerance_ &&
+	  theta_error>theta_pos_tolerance_
       )
 	break;
 	
@@ -358,7 +362,7 @@ void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoa
 	active_goal_.setAborted(result);
 	has_active_goal_ = false;
 	is_executing_ = false;
-	ROS_WARN_STREAM("Reached position was not within given goal tolerance in the given time");
+	ROS_WARN_STREAM("Reached position was not within given goal tolerance in the given time. The errors were: x:"<<x_error<<", y:"<<y_error<<", theta:"<<theta_error<<".");
 	return;
       }
     }
