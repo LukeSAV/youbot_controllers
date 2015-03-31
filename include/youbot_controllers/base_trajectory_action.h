@@ -92,6 +92,7 @@ private:
     GoalHandle active_goal_;
     boost::shared_ptr<Server> trajectory_server_;
     std::string base_link_name_; /// name of the base link
+    std::string robot_base_frame_; /// name of the frame in which the base link is in
     std::string base_planning_frame_; /// name of the tf frame relative to which the base position is being controlled
     std::string base_control_ns_; /// name of the ns in which the position_command topic exists
     ros::Publisher commander_; /// commands 

@@ -64,6 +64,12 @@ BaseTrajectoryAction::BaseTrajectoryAction( ros::NodeHandle& _nh )
     ros::shutdown();
     return;
   }
+  if( !nh_.getParam("/youbot_base/base_frame", robot_base_frame_ ) )
+  {
+    ROS_FATAL("BaseTrajectoryAction couldn't be initialized because no youbot_base/base_frame parameter was found on parameter server. Shutting down the node.");
+    ros::shutdown();
+    return;
+  }
   if( !nh_.getParam("/youbot_base/position_frame", base_planning_frame_ ) )
   {
     ROS_FATAL("BaseTrajectoryAction couldn't be initialized because no youbot_base/position_frame parameter was found on parameter server. Shutting down the node.");
@@ -341,23 +347,30 @@ void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoa
     ros::Duration max_wait_time(5.0); // 5s wait time max until completion must be reached
     ros::Time start = ros::Time::now();
     
+    //ROS_INFO_STREAM("Position command is: x="<<command.x<<", y="<<command.y<<", theta="<<command.theta<<".");
+    
     while(true)
     {
+      ros::spinOnce();
       geometry_msgs::Pose2D current_state;
       getCurrentBaseState(current_state);
+      
+      //ROS_INFO_STREAM("current base position: x="<<current_state.x<<", y="<<current_state.y<<", theta="<<current_state.theta<<".");
       
       double x_error = fabs(current_state.x-command.x);
       double y_error = fabs(current_state.y-command.y);
       double theta_error = fabs(current_state.theta-command.theta);
       
-      if( x_error>x_pos_tolerance_ &&
-	  y_error>y_pos_tolerance_ &&
-	  theta_error>theta_pos_tolerance_
+      if( x_error<=x_pos_tolerance_ &&
+	  y_error<=y_pos_tolerance_ &&
+	  theta_error<=theta_pos_tolerance_
       )
+      {
 	break;
-	
+      }
       else if( ros::Time::now() >= (start+max_wait_time) )
       {
+	//break; // this seems not to work properly yet... /////////////// TODO ///////////////////////////////////////////////////////////////////////////////////////////////////
 	result.error_code = control_msgs::FollowJointTrajectoryResult::GOAL_TOLERANCE_VIOLATED;
 	active_goal_.setAborted(result);
 	has_active_goal_ = false;
@@ -409,13 +422,13 @@ void BaseTrajectoryAction::ignoreTime()
 bool BaseTrajectoryAction::getCurrentBaseState( geometry_msgs::Pose2D& _current_state )
 {
   ros::Time now = ros::Time::now();
-  bool got_transform = tf_listener_.waitForTransform( base_planning_frame_, base_link_name_, now, ros::Duration(0.1) );
+  bool got_transform = tf_listener_.waitForTransform( base_planning_frame_, robot_base_frame_, now, ros::Duration(0.1) );
   
   if(!got_transform)
     return false;
   
   tf::StampedTransform curr_base_pos;
-  tf_listener_.lookupTransform( base_planning_frame_, base_link_name_, now, curr_base_pos );
+  tf_listener_.lookupTransform( base_planning_frame_, robot_base_frame_, now, curr_base_pos );
   
   _current_state.x = curr_base_pos.getOrigin().x();
   _current_state.y = curr_base_pos.getOrigin().y();
