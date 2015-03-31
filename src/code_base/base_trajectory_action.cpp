@@ -353,22 +353,26 @@ void BaseTrajectoryAction::execute( const control_msgs::FollowJointTrajectoryGoa
     {
       ros::spinOnce();
       geometry_msgs::Pose2D current_state;
-      getCurrentBaseState(current_state);
+      bool got_current_state = getCurrentBaseState(current_state);
       
+      double x_error, y_error, theta_error;
       //ROS_INFO_STREAM("current base position: x="<<current_state.x<<", y="<<current_state.y<<", theta="<<current_state.theta<<".");
-      
-      double x_error = fabs(current_state.x-command.x);
-      double y_error = fabs(current_state.y-command.y);
-      double theta_error = fabs(current_state.theta-command.theta);
-      
-      if( x_error<=x_pos_tolerance_ &&
-	  y_error<=y_pos_tolerance_ &&
-	  theta_error<=theta_pos_tolerance_
-      )
+      if(got_current_state)
       {
-	break;
+	x_error = fabs(current_state.x-command.x);
+	y_error = fabs(current_state.y-command.y);
+	theta_error = fabs(current_state.theta-command.theta);
+	
+	if( x_error<=x_pos_tolerance_ &&
+	    y_error<=y_pos_tolerance_ &&
+	    theta_error<=theta_pos_tolerance_
+	)
+	{
+	  break;
+	}
       }
-      else if( ros::Time::now() >= (start+max_wait_time) )
+      
+      if( ros::Time::now() >= (start+max_wait_time) )
       {
 	//break; // this seems not to work properly yet... /////////////// TODO ///////////////////////////////////////////////////////////////////////////////////////////////////
 	result.error_code = control_msgs::FollowJointTrajectoryResult::GOAL_TOLERANCE_VIOLATED;
